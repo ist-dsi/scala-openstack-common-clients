@@ -8,11 +8,11 @@
 
 Common functionality shared among the various Scala Openstack clients:
 
-- [Keystone/Identity)](https://github.com/ist-dsi/scala-keystone-client)
-- [Designate/DNS)](https://github.com/ist-dsi/scala-designate-client)
-- [Cinder/Block Storage)](https://github.com/ist-dsi/scala-cinder-client)
-- [Neutron/Network)](https://github.com/ist-dsi/scala-neutron-client)
-- [Nova/Compute)](https://github.com/ist-dsi/scala-nova-client)
+- [Keystone/Identity](https://github.com/ist-dsi/scala-keystone-client)
+- [Designate/DNS](https://github.com/ist-dsi/scala-designate-client)
+- [Cinder/Block Storage](https://github.com/ist-dsi/scala-cinder-client)
+- [Neutron/Network](https://github.com/ist-dsi/scala-neutron-client)
+- [Nova/Compute](https://github.com/ist-dsi/scala-nova-client)
 
 [Latest scaladoc documentation](https://ist-dsi.github.io/scala-openstack-common-clients/latest/api/pt/tecnico/dsi/scala-openstack-common-clients/index.html)
 
