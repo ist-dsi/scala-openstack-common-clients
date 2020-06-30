@@ -54,11 +54,9 @@ abstract class Service[F[_]](protected val authToken: Header)(implicit protected
     expect(POST, value, uri, wrappedAt)
 
   protected def list[R: Decoder](baseKey: String, uri: Uri, query: Query): Stream[F, R] = {
-    val nextDecoder: Decoder[Option[Uri]] = Link.linksDecoder.at("links").or(Link.linksDecoder.at(s"${baseKey}_links"))
-      .map(_.collectFirst { case Link("next", uri) => uri})
-
     implicit val paginatedDecoder: Decoder[(Option[Uri], List[R])] = (c: HCursor) => for {
-      next <- nextDecoder.tryDecode(c)
+      links <- c.get("links")(Link.linksDecoder).orElse(c.getOrElse(s"${baseKey}_links")(List.empty[Link])(Link.linksDecoder))
+      next = links.collectFirst { case Link("next", uri) => uri}
       objectList <- c.downField(baseKey).as[List[R]]
     } yield (next, objectList)
 
