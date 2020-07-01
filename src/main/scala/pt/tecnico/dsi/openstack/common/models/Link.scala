@@ -11,7 +11,7 @@ object Link {
   // TODO: is this the right place for this decoder?
   implicit val linksDecoder: Decoder[List[Link]] = { cursor: HCursor =>
     // Openstack has two ways to represent links (because why not):
-    // This one is mostly used in Keystone
+    // This one is mostly used in Keystone and designate
     //   "links": {
     //     "self": "http://example.com/identity/v3/role_assignments",
     //     "previous": null,
