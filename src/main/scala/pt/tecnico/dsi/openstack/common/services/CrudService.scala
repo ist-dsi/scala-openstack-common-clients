@@ -19,25 +19,25 @@ abstract class CrudService[F[_]: Sync: Client, Model: Decoder, Create: Encoder, 
   val uri: Uri = baseUri / pluralName
   protected val wrappedAt: Option[String] = Option.when(wrapped)(name)
 
-  def list(): Stream[F, WithId[Model]] = list(Query.empty)
-  def list(query: Query): Stream[F, WithId[Model]] = super.list[WithId[Model]](pluralName, uri, query)
+  def list(extraHeaders: Header*): Stream[F, WithId[Model]] = list(Query.empty, extraHeaders:_*)
+  def list(query: Query, extraHeaders: Header*): Stream[F, WithId[Model]] = super.list[WithId[Model]](pluralName, uri, query, extraHeaders:_*)
 
-  def create(value: Create): F[WithId[Model]] = super.post(value, uri, wrappedAt)
+  def create(value: Create, extraHeaders: Header*): F[WithId[Model]] = super.post(wrappedAt, value, uri, extraHeaders:_*)
 
-  protected def createHandleConflict(value: Create, uri: Uri = this.uri)(onConflict: F[WithId[Model]]): F[WithId[Model]] = {
+  protected def createHandleConflict(value: Create, extraHeaders: Header*)(onConflict: F[WithId[Model]]): F[WithId[Model]] = {
     implicit val d: EntityDecoder[F, WithId[Model]] = unwrapped(wrappedAt)
     implicit val e: EntityEncoder[F, Create] = wrapped(wrappedAt)
-    POST(value, uri, authToken).flatMap(client.run(_).use {
+    POST(value, uri, (authToken +: extraHeaders):_*).flatMap(client.run(_).use {
       case Successful(response) => response.as[WithId[Model]]
       case Conflict(_) => onConflict
       case response => F.raiseError(UnexpectedStatus(response.status))
     })
   }
 
-  def get(id: String): F[WithId[Model]] = super.get(uri / id, wrappedAt)
+  def get(id: String, extraHeaders: Header*): F[WithId[Model]] = super.get(wrappedAt, uri / id, extraHeaders:_*)
 
-  def update(id: String, value: Update): F[WithId[Model]] = super.patch(value, uri / id, wrappedAt)
+  def update(id: String, value: Update, extraHeaders: Header*): F[WithId[Model]] = super.patch(wrappedAt, value, uri / id, extraHeaders:_*)
 
-  def delete(value: WithId[Model]): F[Unit] = delete(value.id)
-  def delete(id: String): F[Unit] = super.delete(uri / id)
+  def delete(value: WithId[Model], extraHeaders: Header*): F[Unit] = delete(value.id, extraHeaders:_*)
+  def delete(id: String, extraHeaders: Header*): F[Unit] = super.delete(uri / id, extraHeaders:_*)
 }
