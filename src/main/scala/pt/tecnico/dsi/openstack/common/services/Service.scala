@@ -6,7 +6,7 @@ import cats.syntax.functor._
 import fs2.{Chunk, Stream}
 import io.circe.{Decoder, Encoder, HCursor, Json, Printer}
 import org.http4s.Method.{DELETE, GET, PATCH, POST, PUT, PermitsBody}
-import org.http4s.Status.{Gone, NotFound, Successful}
+import org.http4s.Status.{Conflict, Gone, NotFound, Successful}
 import org.http4s.client.dsl.Http4sClientDsl
 import org.http4s.client.{Client, UnexpectedStatus}
 import org.http4s.{EntityDecoder, EntityEncoder, Header, Method, Query, Request, Uri, circe}
@@ -123,6 +123,16 @@ abstract class Service[F[_]](protected val authToken: Header)(implicit protected
 
   protected def post[V: Encoder, R: Decoder](wrappedAt: Option[String], value: V, uri: Uri, extraHeaders: Header*): F[R] =
     expect(wrappedAt, POST, value, uri, extraHeaders:_*)
+
+  protected def postHandleConflict[V: Encoder, R: Decoder](wrappedAt: Option[String], value: V, uri: Uri, extraHeaders: Header*)(onConflict: F[R]): F[R] = {
+    implicit val d: EntityDecoder[F, R] = unwrapped(wrappedAt)
+    implicit val e: EntityEncoder[F, V] = wrapped(wrappedAt)
+    POST(value, uri, (authToken +: extraHeaders):_*).flatMap(client.run(_).use {
+      case Successful(response) => response.as[R]
+      case Conflict(_) => onConflict
+      case response => F.raiseError(UnexpectedStatus(response.status))
+    })
+  }
 
   /**
    * Invokes a GET request on the specified `uri`, expecting the returned json to be paginated. Automatically fetches more pages

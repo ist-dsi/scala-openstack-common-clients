@@ -1,19 +1,14 @@
 package pt.tecnico.dsi.openstack.common.services
 
 import cats.effect.Sync
-import cats.syntax.flatMap._
 import fs2.Stream
 import io.circe.{Decoder, Encoder}
-import org.http4s.Method.POST
-import org.http4s.Status.{Conflict, Successful}
-import org.http4s.client.{Client, UnexpectedStatus}
-import org.http4s.{EntityDecoder, EntityEncoder, Header, Query, Uri}
+import org.http4s.client.Client
+import org.http4s.{Header, Query, Uri}
 import pt.tecnico.dsi.openstack.common.models.WithId
 
 abstract class CrudService[F[_]: Sync: Client, Model: Decoder, Create: Encoder, Update: Encoder]
   (baseUri: Uri, val name: String, authToken: Header, wrapped: Boolean = true) extends Service[F](authToken) {
-
-  import dsl._
 
   val pluralName = s"${name}s"
   val uri: Uri = baseUri / pluralName
@@ -24,15 +19,8 @@ abstract class CrudService[F[_]: Sync: Client, Model: Decoder, Create: Encoder, 
 
   def create(value: Create, extraHeaders: Header*): F[WithId[Model]] = super.post(wrappedAt, value, uri, extraHeaders:_*)
 
-  protected def createHandleConflict(value: Create, extraHeaders: Header*)(onConflict: F[WithId[Model]]): F[WithId[Model]] = {
-    implicit val d: EntityDecoder[F, WithId[Model]] = unwrapped(wrappedAt)
-    implicit val e: EntityEncoder[F, Create] = wrapped(wrappedAt)
-    POST(value, uri, (authToken +: extraHeaders):_*).flatMap(client.run(_).use {
-      case Successful(response) => response.as[WithId[Model]]
-      case Conflict(_) => onConflict
-      case response => F.raiseError(UnexpectedStatus(response.status))
-    })
-  }
+  protected def createHandleConflict(value: Create, extraHeaders: Header*)(onConflict: F[WithId[Model]]): F[WithId[Model]] =
+    super.postHandleConflict(wrappedAt, value, uri, extraHeaders:_*)(onConflict)
 
   def get(id: String, extraHeaders: Header*): F[WithId[Model]] = super.get(wrappedAt, uri / id, extraHeaders:_*)
 
