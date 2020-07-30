@@ -41,7 +41,7 @@ scalacOptions in (Test, console) := (scalacOptions in (Compile, console)).value
 // ==== Dependencies ====================================================================================================
 // ======================================================================================================================
 libraryDependencies ++= Seq("blaze-client", "circe").map { module =>
-  "org.http4s"      %% s"http4s-$module" % "0.21.6"
+  "org.http4s"      %% s"http4s-$module" % "1.0.0-M3"
 } ++ Seq(
   "io.circe"        %% "circe-derivation"      % "0.13.0-M4",
 )
@@ -101,7 +101,7 @@ developers ++= List(
 )
 
 // Fail the build/release if updates there are updates for the dependencies
-//dependencyUpdatesFailBuild := true
+dependencyUpdatesFailBuild := true
 
 releaseUseGlobalVersion := false
 releaseNextCommitMessage := s"Setting version to ${ReleasePlugin.runtimeVersion.value} [skip ci]"

@@ -88,6 +88,13 @@ abstract class Service[F[_]](protected val authToken: Header)(implicit protected
    */
   protected def expectUnwrapped[R: Decoder](wrappedAt: Option[String], request: F[Request[F]]): F[R] =
     client.expect(request)(unwrapped(wrappedAt))
+  /**
+   * Submits `request` and decodes the response to a `Option[R]` on success.
+   * @param wrappedAt whether to decode `R` at the Json root, or at the field `at`.
+   * @param request the request to execute.
+   */
+  protected def expectOptionUnwrapped[R: Decoder](wrappedAt: Option[String], request: F[Request[F]]): F[Option[R]] =
+    request.flatMap(client.expectOption(_)(unwrapped(wrappedAt)))
 
   /**
    * Invokes `method` on the specified `uri` passing as body `value`. The response will be parsed to an `R`.
@@ -101,6 +108,19 @@ abstract class Service[F[_]](protected val authToken: Header)(implicit protected
     implicit val e: EntityEncoder[F, B] = wrapped(wrappedAt)
     expectUnwrapped(wrappedAt, method.apply(value, uri, (authToken +: extraHeaders):_*))
   }
+  /**
+   * Invokes `method` on the specified `uri` passing as body `value`. The response will be parsed to an `Option[R]`.
+   * @param wrappedAt whether to encode `B` and decode `R` at the Json root, or at the field `at`.
+   * @param method the method to use, eg: GET, POST, etc.
+   * @param value the value to send in the body. This value will be json encoded using `wrapped`.
+   * @param uri the uri to which the request will be made.
+   * @param extraHeaders extra headers to be used. The `authToken` header is always added.
+   */
+  protected def expectOption[B: Encoder, R: Decoder](wrappedAt: Option[String], method: Method with PermitsBody, value: B,
+    uri: Uri, extraHeaders: Header*): F[Option[R]] = {
+    implicit val e: EntityEncoder[F, B] = wrapped(wrappedAt)
+    expectOptionUnwrapped(wrappedAt, method.apply(value, uri, (authToken +: extraHeaders):_*))
+  }
 
   /**
    * Invokes `method` on the specified `uri` without any body. The response will be parsed to an `R`.
@@ -111,9 +131,20 @@ abstract class Service[F[_]](protected val authToken: Header)(implicit protected
    */
   protected def expect[R: Decoder](wrappedAt: Option[String], method: Method with PermitsBody, uri: Uri, extraHeaders: Header*): F[R] =
     expectUnwrapped(wrappedAt, method.apply(uri, (authToken +: extraHeaders):_*))
+  /**
+   * Invokes `method` on the specified `uri` without any body. The response will be parsed to an `Option[R]`.
+   * @param wrappedAt whether to decode `R` at the Json root, or at the field `at`.
+   * @param method the method to use, eg: GET, POST, etc.
+   * @param uri the uri to which the request will be made.
+   * @param extraHeaders extra headers to be used. The `authToken` header is always added.
+   */
+  protected def expectOption[R: Decoder](wrappedAt: Option[String], method: Method with PermitsBody, uri: Uri, extraHeaders: Header*): F[Option[R]] =
+    expectOptionUnwrapped(wrappedAt, method.apply(uri, (authToken +: extraHeaders):_*))
 
   protected def get[R: Decoder](wrappedAt: Option[String], uri: Uri, extraHeaders: Header*): F[R] =
     expect(wrappedAt, GET, uri, extraHeaders:_*)
+  protected def getOption[R: Decoder](wrappedAt: Option[String], uri: Uri, extraHeaders: Header*): F[Option[R]] =
+    expectOption(wrappedAt, GET, uri, extraHeaders:_*)
 
   protected def put[V: Encoder, R: Decoder](wrappedAt: Option[String], value: V, uri: Uri, extraHeaders: Header*): F[R] =
     expect(wrappedAt, PUT, value, uri, extraHeaders:_*)

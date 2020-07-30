@@ -11,13 +11,13 @@ object Link {
   // TODO: is this the right place for this decoder?
   implicit val linksDecoder: Decoder[List[Link]] = { cursor: HCursor =>
     // Openstack has two ways to represent links (because why not):
-    // This one is mostly used in Keystone and designate
+    // This one is mostly used in Keystone and Designate
     //   "links": {
     //     "self": "http://example.com/identity/v3/role_assignments",
     //     "previous": null,
     //     "next": null
     //   }
-    // This one is mostly used everywhere else
+    // This one is used everywhere else
     //   "links": [
     //     {
     //       "href": "http://127.0.0.1:33951/v3/89afd400-b646-4bbc-b12b-c0a4d63e5bd3/volumes/2b955850-f177-45f7-9f49-ecb2c256d161",
@@ -26,6 +26,7 @@ object Link {
     //       "href": "http://127.0.0.1:33951/89afd400-b646-4bbc-b12b-c0a4d63e5bd3/volumes/2b955850-f177-45f7-9f49-ecb2c256d161",
     //       "rel": "bookmark"
     //     }
+    //   ]
     val value = cursor.value
     if (value.isArray) Decoder.decodeList[Link].apply(cursor) // This cursor.as[List[Link]] would lead to a stack overflow
     else if (value.isObject) value.dropNullValues.as[Map[String, Uri]].map(_.map{ case (rel, uri) => Link(rel, uri) }.toList)
