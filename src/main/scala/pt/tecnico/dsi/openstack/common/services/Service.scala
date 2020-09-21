@@ -76,11 +76,14 @@ abstract class Service[F[_]](protected val authToken: Header)(implicit protected
    * @param at whether to encode `R` at the Json root, or at the field `at`.
    * @param encoder the circe encoder capable of converting an R to Json.
    */
-  protected def wrapped[R](at: Option[String] = None)(implicit encoder: Encoder[R]): EntityEncoder[F, R] =
+  protected def wrapped[R](at: Option[String] = None)(implicit encoder: Encoder[R]): EntityEncoder[F, R] = {
+    //jsonEncoder(at.fold(encoder)(encoder.at))
     jsonEncoder(at.fold(encoder) { name =>
+      // https://github.com/circe/circe/issues/1536
       encoder.mapJson(originalJson => Json.obj(name -> originalJson))
     })
-
+  }
+  
   /**
    * Submits `request` and decodes the response to a `R` on success.
    * @param wrappedAt whether to decode `R` at the Json root, or at the field `at`.
