@@ -3,20 +3,24 @@ package pt.tecnico.dsi.openstack.common.services
 import cats.effect.Sync
 import cats.syntax.flatMap._
 import cats.syntax.functor._
+import cats.instances.string._
 import fs2.{Chunk, Stream}
 import io.circe.{Decoder, Encoder, HCursor, Json, Printer}
 import org.http4s.Method.{DELETE, GET, PATCH, POST, PUT, PermitsBody}
 import org.http4s.Status.{Conflict, Gone, NotFound, Successful}
 import org.http4s.client.dsl.Http4sClientDsl
-import org.http4s.client.{Client, UnexpectedStatus}
-import org.http4s.{EntityDecoder, EntityEncoder, Header, Method, Query, Request, Uri, circe}
-import pt.tecnico.dsi.openstack.common.models.Link
+import org.http4s.client.Client
+import org.http4s.{EntityDecoder, EntityEncoder, Header, Method, Query, Request, Response, Uri, circe}
+import pt.tecnico.dsi.openstack.common.models.{Link, UnexpectedStatus}
 
 abstract class Service[F[_]](protected val authToken: Header)(implicit protected val client: Client[F], protected val F: Sync[F]) {
+  // This basically gives us the ability to do POST(value, uri, (authToken +: extraHeaders):_*) however it returns F[Request[F]]
+  // Which then forces us to do POST(value, uri, (authToken +: extraHeaders):_*).flatMap(client.run(_).use(...)
+  // We could make our own DSL to be just client.run(POST(value, uri, (authToken +: extraHeaders):_*)).use(...)
   protected val dsl = new Http4sClientDsl[F] {}
   import dsl._
 
-  protected  val jsonPrinter: Printer = Printer.noSpaces.copy(dropNullValues = true)
+  protected val jsonPrinter: Printer = Printer.noSpaces.copy(dropNullValues = true)
   protected implicit def jsonEncoder[A: Encoder]: EntityEncoder[F, A] = circe.jsonEncoderWithPrinterOf(jsonPrinter)
   protected implicit def jsonDecoder[A: Decoder]: EntityDecoder[F, A] = circe.accumulatingJsonOf
 
@@ -24,8 +28,10 @@ abstract class Service[F[_]](protected val authToken: Header)(implicit protected
   // have a higher priority than the jsonDecoder defined above. https://github.com/http4s/http4s/issues/2806
   protected implicit val void: EntityDecoder[F, Unit] = EntityDecoder.void
 
+  // If Openstack had a normal REST API (without the wrapping) we wouldn't need 80% of these methods.
+  
   /**
-   * Creates an `EntityDecoder` which will decode the response from Json.
+   * Creates a `Decoder` which will decode the response from Json.
    * When `at` is `None` `R` will be decoded directly from the Json root (the normal implementation for most Json REST APIs). Example:
    * {{{
    *  {
@@ -35,7 +41,7 @@ abstract class Service[F[_]](protected val authToken: Header)(implicit protected
    *  }
    * }}}
    * When `at` is a `Some(x)` `R` will be decoded from the Json object located in the field `x`.
-   * For `R` to be correctly parsed in this example `at` should be Some("quota"):
+   * For `R` to be correctly parsed in this example `at` should be `Some("quota")`:
    * {{{
    *  {
    *    "quota": {
@@ -63,7 +69,7 @@ abstract class Service[F[_]](protected val authToken: Header)(implicit protected
    *  }
    * }}}
    * When `at` is a `Some(x)` `R` will be encoded inside a Json object with a single field named `x`.
-   * In this example `at` was set to Some("quota"):
+   * In this example `at` was set to `Some("quota")`:
    * {{{
    *  {
    *    "quota": {
@@ -89,16 +95,21 @@ abstract class Service[F[_]](protected val authToken: Header)(implicit protected
    * @param wrappedAt whether to decode `R` at the Json root, or at the field `at`.
    * @param request the request to execute.
    */
-  protected def expectUnwrapped[R: Decoder](wrappedAt: Option[String], request: F[Request[F]]): F[R] =
-    client.expect(request)(unwrapped(wrappedAt))
+  protected def expectUnwrapped[R: Decoder](wrappedAt: Option[String], request: F[Request[F]]): F[R] = {
+    implicit val e: EntityDecoder[F, R] = unwrapped(wrappedAt)
+    request.flatMap(client.expectOr(_)(defaultOnError))
+  }
+  
   /**
    * Submits `request` and decodes the response to a `Option[R]` on success.
    * @param wrappedAt whether to decode `R` at the Json root, or at the field `at`.
    * @param request the request to execute.
    */
-  protected def expectOptionUnwrapped[R: Decoder](wrappedAt: Option[String], request: F[Request[F]]): F[Option[R]] =
-    request.flatMap(client.expectOption(_)(unwrapped(wrappedAt)))
-
+  protected def expectOptionUnwrapped[R: Decoder](wrappedAt: Option[String], request: F[Request[F]]): F[Option[R]] = {
+    implicit val e: EntityDecoder[F, R] = unwrapped(wrappedAt)
+    request.flatMap(client.expectOptionOr(_)(defaultOnError))
+  }
+  
   /**
    * Invokes `method` on the specified `uri` passing as body `value`. The response will be parsed to an `R`.
    * @param wrappedAt whether to encode `B` and decode `R` at the Json root, or at the field `at`.
@@ -107,8 +118,8 @@ abstract class Service[F[_]](protected val authToken: Header)(implicit protected
    * @param uri the uri to which the request will be made.
    * @param extraHeaders extra headers to be used. The `authToken` header is always added.
    */
-  protected def expect[B: Encoder, R: Decoder](wrappedAt: Option[String], method: Method with PermitsBody, value: B, uri: Uri, extraHeaders: Header*): F[R] = {
-    implicit val e: EntityEncoder[F, B] = wrapped(wrappedAt)
+  protected def expect[V: Encoder, R: Decoder](wrappedAt: Option[String], method: Method with PermitsBody, value: V, uri: Uri, extraHeaders: Header*): F[R] = {
+    implicit val e: EntityEncoder[F, V] = wrapped(wrappedAt)
     expectUnwrapped(wrappedAt, method.apply(value, uri, (authToken +: extraHeaders):_*))
   }
   /**
@@ -119,8 +130,8 @@ abstract class Service[F[_]](protected val authToken: Header)(implicit protected
    * @param uri the uri to which the request will be made.
    * @param extraHeaders extra headers to be used. The `authToken` header is always added.
    */
-  protected def expectOption[B: Encoder, R: Decoder](wrappedAt: Option[String], method: Method with PermitsBody, value: B,
-    uri: Uri, extraHeaders: Header*): F[Option[R]] = {
+  protected def expectOption[B: Encoder, R: Decoder](wrappedAt: Option[String], method: Method with PermitsBody, value: B, uri: Uri, extraHeaders: Header*)
+  : F[Option[R]] = {
     implicit val e: EntityEncoder[F, B] = wrapped(wrappedAt)
     expectOptionUnwrapped(wrappedAt, method.apply(value, uri, (authToken +: extraHeaders):_*))
   }
@@ -154,17 +165,32 @@ abstract class Service[F[_]](protected val authToken: Header)(implicit protected
 
   protected def patch[V: Encoder, R: Decoder](wrappedAt: Option[String], value: V, uri: Uri, extraHeaders: Header*): F[R] =
     expect(wrappedAt, PATCH, value, uri, extraHeaders:_*)
-
+  
   protected def post[V: Encoder, R: Decoder](wrappedAt: Option[String], value: V, uri: Uri, extraHeaders: Header*): F[R] =
     expect(wrappedAt, POST, value, uri, extraHeaders:_*)
 
-  protected def postHandleConflict[V: Encoder, R: Decoder](wrappedAt: Option[String], value: V, uri: Uri, extraHeaders: Header*)(onConflict: F[R]): F[R] = {
+  protected def postHandleConflict[V: Encoder, R: Decoder](wrappedAt: Option[String], value: V, uri: Uri, extraHeaders: Seq[Header])(onConflict: F[R]): F[R] = {
     implicit val d: EntityDecoder[F, R] = unwrapped(wrappedAt)
     implicit val e: EntityEncoder[F, V] = wrapped(wrappedAt)
     POST(value, uri, (authToken +: extraHeaders):_*).flatMap(client.run(_).use {
       case Successful(response) => response.as[R]
       case Conflict(_) => onConflict
-      case response => F.raiseError(UnexpectedStatus(response.status))
+      case response => defaultOnError(response)
+    })
+  }
+  
+  type /=>[-T, +R] = PartialFunction[T, R]
+  
+  protected def postHandleConflictWithError[V: Encoder, R: Decoder, E <: Throwable: Decoder]
+  (wrappedAt: Option[String], value: V, uri: Uri, extraHeaders: Seq[Header])(onConflict: E /=> F[R]): F[R] = {
+    implicit val d: EntityDecoder[F, R] = unwrapped(wrappedAt)
+    implicit val e: EntityEncoder[F, V] = wrapped(wrappedAt)
+    POST.apply(value, uri, (authToken +: extraHeaders):_*).flatMap(client.run(_).use {
+      case Successful(response) => response.as[R]
+      case response => response.as[E].flatMap {
+        case error if response.status == Conflict => onConflict.applyOrElse(error, F.raiseError)
+        case error => F.raiseError(error)
+      }
     })
   }
 
@@ -178,10 +204,10 @@ abstract class Service[F[_]](protected val authToken: Header)(implicit protected
    * @param extraHeaders extra headers to be used. The `authToken` header is always added.
    * @tparam R the type of the elements returned.
    */
-  protected def list[R: Decoder](wrappedAt: String, uri: Uri, query: Query, extraHeaders: Header*): Stream[F, R] = {
+  protected def stream[R: Decoder](wrappedAt: String, uri: Uri, query: Query, extraHeaders: Header*): Stream[F, R] = {
     implicit val paginatedDecoder: Decoder[(Option[Uri], List[R])] = (c: HCursor) => for {
-      links <- c.get("links")(Link.linksDecoder).orElse(c.getOrElse(s"${wrappedAt}_links")(List.empty[Link])(Link.linksDecoder))
-      next = links.collectFirst { case Link("next", uri) => uri}
+      links <- c.get[List[Link]]("links") orElse c.getOrElse(s"${wrappedAt}_links")(List.empty[Link])
+      next = links.collectFirst { case Link("next", uri) => uri }
       objectList <- c.downField(wrappedAt).as[List[R]]
     } yield (next, objectList)
 
@@ -195,6 +221,19 @@ abstract class Service[F[_]](protected val authToken: Header)(implicit protected
       case None => F.pure(None)
     }
   }
+  
+  /**
+   * Invokes a GET request on the specified `uri`, expecting to receive a list of elements. If the response is paginated <b>all</b>
+   * elements will be returned, be careful as this might take a lot of time and memory.
+   * @param wrappedAt the Json object field where `R` will be decoded from.
+   * @param uri the uri to which the request will be made.
+   * @param query extra query parameters to pass in every request. These are separated from Uri because this method will need to append
+   *              query params for the next page/marker/offset.
+   * @param extraHeaders extra headers to be used. The `authToken` header is always added.
+   * @tparam R the type of the elements returned.
+   */
+  protected def list[R: Decoder](wrappedAt: String, uri: Uri, query: Query, extraHeaders: Header*): F[List[R]] =
+    stream(wrappedAt, uri, query, extraHeaders:_*).compile.toList
 
   /**
    * An idempotent delete. If NotFound or Gone are returned this method will succeed.
@@ -203,7 +242,12 @@ abstract class Service[F[_]](protected val authToken: Header)(implicit protected
    */
   protected def delete(uri: Uri, extraHeaders: Header*): F[Unit] =
     DELETE.apply(uri, (authToken +: extraHeaders):_*).flatMap(client.run(_).use {
-      case Successful(_) | NotFound(_) | Gone(_) => F.pure(())
-      case response => F.raiseError(UnexpectedStatus(response.status))
+      case Successful(_) | NotFound(_) | Gone(_) => F.unit
+      case response => defaultOnError(response)
     })
+  
+  protected def defaultOnError[R](response: Response[F]): F[R] = {
+    // https://github.com/http4s/http4s/issues/3707
+    response.bodyText.compile.foldMonoid.flatMap(bodyString => F.raiseError(UnexpectedStatus(response.status, bodyString)))
+  }
 }
