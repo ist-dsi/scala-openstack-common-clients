@@ -41,7 +41,7 @@ scalacOptions in (Test, console) := (scalacOptions in (Compile, console)).value
 // ==== Dependencies ====================================================================================================
 // ======================================================================================================================
 libraryDependencies ++= Seq("blaze-client", "circe").map { module =>
-  "org.http4s"      %% s"http4s-$module" % "1.0.0-M4"
+  "org.http4s"      %% s"http4s-$module" % "1.0.0-M5"
 } ++ Seq(
   "io.circe"        %% "circe-derivation"      % "0.13.0-M4",
 )
@@ -76,10 +76,16 @@ excludeFilter in ghpagesCleanSite := AllPassFilter // We want to keep all the pr
 val latestFileName = "latest"
 val createLatestSymlink = taskKey[Unit](s"Creates a symlink named $latestFileName which points to the latest version.")
 createLatestSymlink := {
-  ghpagesSynchLocal.value // Ensure the ghpagesRepository already exists
   import java.nio.file.Files
-  val path = (ghpagesRepository.value / "api" / latestFileName).toPath
-  if (!Files.isSymbolicLink(path)) Files.createSymbolicLink(path, new File(latestReleasedVersion.value).toPath)
+  // We use ghpagesSynchLocal instead of ghpagesRepository to ensure the files in the local filesystem already exist
+  val linkName = (ghpagesSynchLocal.value / "api" / latestFileName).toPath
+  val target = new File(latestReleasedVersion.value).toPath
+  if (Files.isSymbolicLink(linkName) && Files.readSymbolicLink(linkName) == target) {
+    // All good
+  } else {
+    Files.delete(linkName)
+    Files.createSymbolicLink(linkName, target)
+  }
 }
 ghpagesPushSite := ghpagesPushSite.dependsOn(createLatestSymlink).value
 ghpagesBranch := "gh-pages"

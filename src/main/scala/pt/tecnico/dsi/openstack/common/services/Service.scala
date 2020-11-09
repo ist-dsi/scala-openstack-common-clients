@@ -6,11 +6,11 @@ import cats.syntax.functor._
 import cats.instances.string._
 import fs2.{Chunk, Stream}
 import io.circe.{Decoder, Encoder, HCursor, Json, Printer}
-import org.http4s.Method.{DELETE, GET, PATCH, POST, PUT, PermitsBody}
+import org.http4s.Method.{DELETE, GET, PATCH, POST, PUT}
 import org.http4s.Status.{Conflict, Gone, NotFound, Successful}
 import org.http4s.client.dsl.Http4sClientDsl
 import org.http4s.client.Client
-import org.http4s.{EntityDecoder, EntityEncoder, Header, Method, Query, Request, Response, Uri, circe}
+import org.http4s.{EntityDecoder, EntityEncoder, Header, Method, Request, Response, Uri, circe}
 import pt.tecnico.dsi.openstack.common.models.{Link, UnexpectedStatus}
 
 abstract class Service[F[_]](protected val authToken: Header)(implicit protected val client: Client[F], protected val F: Sync[F]) {
@@ -118,7 +118,7 @@ abstract class Service[F[_]](protected val authToken: Header)(implicit protected
    * @param uri the uri to which the request will be made.
    * @param extraHeaders extra headers to be used. The `authToken` header is always added.
    */
-  protected def expect[V: Encoder, R: Decoder](wrappedAt: Option[String], method: Method with PermitsBody, value: V, uri: Uri, extraHeaders: Header*): F[R] = {
+  protected def expect[V: Encoder, R: Decoder](wrappedAt: Option[String], method: Method, value: V, uri: Uri, extraHeaders: Header*): F[R] = {
     implicit val e: EntityEncoder[F, V] = wrapped(wrappedAt)
     expectUnwrapped(wrappedAt, method.apply(value, uri, (authToken +: extraHeaders):_*))
   }
@@ -130,7 +130,7 @@ abstract class Service[F[_]](protected val authToken: Header)(implicit protected
    * @param uri the uri to which the request will be made.
    * @param extraHeaders extra headers to be used. The `authToken` header is always added.
    */
-  protected def expectOption[B: Encoder, R: Decoder](wrappedAt: Option[String], method: Method with PermitsBody, value: B, uri: Uri, extraHeaders: Header*)
+  protected def expectOption[B: Encoder, R: Decoder](wrappedAt: Option[String], method: Method, value: B, uri: Uri, extraHeaders: Header*)
   : F[Option[R]] = {
     implicit val e: EntityEncoder[F, B] = wrapped(wrappedAt)
     expectOptionUnwrapped(wrappedAt, method.apply(value, uri, (authToken +: extraHeaders):_*))
@@ -143,7 +143,7 @@ abstract class Service[F[_]](protected val authToken: Header)(implicit protected
    * @param uri the uri to which the request will be made.
    * @param extraHeaders extra headers to be used. The `authToken` header is always added.
    */
-  protected def expect[R: Decoder](wrappedAt: Option[String], method: Method with PermitsBody, uri: Uri, extraHeaders: Header*): F[R] =
+  protected def expect[R: Decoder](wrappedAt: Option[String], method: Method, uri: Uri, extraHeaders: Header*): F[R] =
     expectUnwrapped(wrappedAt, method.apply(uri, (authToken +: extraHeaders):_*))
   /**
    * Invokes `method` on the specified `uri` without any body. The response will be parsed to an `Option[R]`.
@@ -152,7 +152,7 @@ abstract class Service[F[_]](protected val authToken: Header)(implicit protected
    * @param uri the uri to which the request will be made.
    * @param extraHeaders extra headers to be used. The `authToken` header is always added.
    */
-  protected def expectOption[R: Decoder](wrappedAt: Option[String], method: Method with PermitsBody, uri: Uri, extraHeaders: Header*): F[Option[R]] =
+  protected def expectOption[R: Decoder](wrappedAt: Option[String], method: Method, uri: Uri, extraHeaders: Header*): F[Option[R]] =
     expectOptionUnwrapped(wrappedAt, method.apply(uri, (authToken +: extraHeaders):_*))
 
   protected def get[R: Decoder](wrappedAt: Option[String], uri: Uri, extraHeaders: Header*): F[R] =
@@ -198,13 +198,11 @@ abstract class Service[F[_]](protected val authToken: Header)(implicit protected
    * Invokes a GET request on the specified `uri`, expecting the returned json to be paginated. Automatically fetches more pages
    * if more elements of the stream are consumed.
    * @param wrappedAt the Json object field where `R` will be decoded from.
-   * @param uri the uri to which the request will be made.
-   * @param query extra query parameters to pass in every request. These are separated from Uri because this method will need to append
-   *              query params for the next page/marker/offset.
+   * @param uri the uri to which the request will be made. Query params related with pagination will be overwritten after the first request.
    * @param extraHeaders extra headers to be used. The `authToken` header is always added.
    * @tparam R the type of the elements returned.
    */
-  protected def stream[R: Decoder](wrappedAt: String, uri: Uri, query: Query, extraHeaders: Header*): Stream[F, R] = {
+  protected def stream[R: Decoder](wrappedAt: String, uri: Uri, extraHeaders: Header*): Stream[F, R] = {
     implicit val paginatedDecoder: Decoder[(Option[Uri], List[R])] = (c: HCursor) => for {
       links <- c.get[List[Link]]("links") orElse c.getOrElse(s"${wrappedAt}_links")(List.empty[Link])
       next = links.collectFirst { case Link("next", uri) => uri }
@@ -214,8 +212,7 @@ abstract class Service[F[_]](protected val authToken: Header)(implicit protected
     Stream.unfoldChunkEval[F, Option[Uri], R](Some(uri)) {
       case Some(uri) =>
         for {
-          // The new uri query params must have precedence, otherwise we would always be getting the same page/marker/offset
-          request <- GET.apply(uri.copy(query = query ++ uri.query.pairs), (authToken +: extraHeaders):_*)
+          request <- GET.apply(uri, (authToken +: extraHeaders):_*)
           (next, entries) <- client.expect[(Option[Uri], List[R])](request)
         } yield Some((Chunk.iterable(entries), next))
       case None => F.pure(None)
@@ -226,14 +223,12 @@ abstract class Service[F[_]](protected val authToken: Header)(implicit protected
    * Invokes a GET request on the specified `uri`, expecting to receive a list of elements. If the response is paginated <b>all</b>
    * elements will be returned, be careful as this might take a lot of time and memory.
    * @param wrappedAt the Json object field where `R` will be decoded from.
-   * @param uri the uri to which the request will be made.
-   * @param query extra query parameters to pass in every request. These are separated from Uri because this method will need to append
-   *              query params for the next page/marker/offset.
+   * @param uri the uri to which the request will be made. Query params related with pagination will be overwritten after the first request.
    * @param extraHeaders extra headers to be used. The `authToken` header is always added.
    * @tparam R the type of the elements returned.
    */
-  protected def list[R: Decoder](wrappedAt: String, uri: Uri, query: Query, extraHeaders: Header*): F[List[R]] =
-    stream(wrappedAt, uri, query, extraHeaders:_*).compile.toList
+  protected def list[R: Decoder](wrappedAt: String, uri: Uri, extraHeaders: Header*): F[List[R]] =
+    stream(wrappedAt, uri, extraHeaders:_*).compile.toList
 
   /**
    * An idempotent delete. If NotFound or Gone are returned this method will succeed.

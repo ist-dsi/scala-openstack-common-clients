@@ -17,19 +17,19 @@ abstract class CrudService[F[_]: Sync: Client, Model <: Identifiable, Create, Up
   protected val wrappedAt: Option[String] = Option.when(wrapped)(name)
   
   def stream(extraHeaders: Header*): Stream[F, Model] = stream(Query.empty, extraHeaders:_*)
-  def stream(query: Query, extraHeaders: Header*): Stream[F, Model] = super.stream[Model](pluralName, uri, query, extraHeaders:_*)
+  def stream(query: Query, extraHeaders: Header*): Stream[F, Model] = super.stream[Model](pluralName, uri.copy(query = query), extraHeaders:_*)
   
   def list(extraHeaders: Header*): F[List[Model]] = list(Query.empty, extraHeaders:_*)
-  def list(query: Query, extraHeaders: Header*): F[List[Model]] = super.list[Model](pluralName, uri, query, extraHeaders:_*)
+  def list(query: Query, extraHeaders: Header*): F[List[Model]] = super.list[Model](pluralName, uri.copy(query = query), extraHeaders:_*)
   
   def create(create: Create, extraHeaders: Header*): F[Model] = super.post(wrappedAt, create, uri, extraHeaders:_*)
   
   /**
-   * Default implementation to resolves the conflict that arises when implementing the createOrUpdate.
+   * Default implementation to resolve the conflict that arises when implementing the createOrUpdate.
    * In other words implements the idempotency logic of the create.
    * @param existing the existing model
-   * @param create the create settings
-   * @param keepExistingElements whether to keep existing settings. See `createOrUpdate` for a more detailed explanation.
+   * @param create the create model
+   * @param keepExistingElements whether to keep existing elements. See `createOrUpdate` for a more detailed explanation.
    * @param extraHeaders extra headers to be used. The `authToken` header is always added.
    * @return the existing model if no modifications are required, otherwise the updated model.
    */
