@@ -1,6 +1,7 @@
 package pt.tecnico.dsi.openstack.common.services
 
 import cats.effect.Sync
+import cats.syntax.flatMap._
 import fs2.Stream
 import io.circe.{Decoder, Encoder}
 import org.http4s.client.Client
@@ -102,13 +103,14 @@ abstract class CrudService[F[_]: Sync: Client, Model <: Identifiable, Create, Up
     super.postHandleConflictWithError[Create, Model, E](wrappedAt, create, uri, extraHeaders)(onConflict)
   
   def get(id: String, extraHeaders: Header*): F[Option[Model]] = super.getOption(wrappedAt, uri / id, extraHeaders:_*)
-  def apply(id: String, extraHeaders: Header*): F[Model] = super.get(wrappedAt, uri / id, extraHeaders:_*)
+  def apply(id: String, extraHeaders: Header*): F[Model] =
+    get(id, extraHeaders:_*).flatMap {
+      case Some(model) => F.pure(model)
+      case None => F.raiseError(new NoSuchElementException(s"""Could not find $name with id "$id"."""))
+    }
   
-  def update(id: String, update: Update, extraHeaders: Header*): F[Model] = {
-    // Maybe we could interpret nested options differently https://github.com/circe/circe/issues/584#issuecomment-346203481
-    // Use a JsonPrinter which does not drop nulls
+  def update(id: String, update: Update, extraHeaders: Header*): F[Model] =
     super.put(wrappedAt, update, uri / id, extraHeaders:_*)
-  }
   
   def delete(model: Model, extraHeaders: Header*): F[Unit] = delete(model.id, extraHeaders:_*)
   def delete(id: String, extraHeaders: Header*): F[Unit] = super.delete(uri / id, extraHeaders:_*)
