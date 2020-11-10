@@ -16,10 +16,10 @@ abstract class CrudService[F[_]: Sync: Client, Model <: Identifiable, Create, Up
   val uri: Uri = baseUri / pluralName
   protected val wrappedAt: Option[String] = Option.when(wrapped)(name)
   
-  def stream(extraHeaders: Header*): Stream[F, Model] = stream(Query.empty, extraHeaders:_*)
+  def stream(pairs: (String, String)*): Stream[F, Model] = stream(Query.fromPairs(pairs:_*))
   def stream(query: Query, extraHeaders: Header*): Stream[F, Model] = super.stream[Model](pluralName, uri.copy(query = query), extraHeaders:_*)
   
-  def list(extraHeaders: Header*): F[List[Model]] = list(Query.empty, extraHeaders:_*)
+  def list(pairs: (String, String)*): F[List[Model]] = list(Query.fromPairs(pairs:_*))
   def list(query: Query, extraHeaders: Header*): F[List[Model]] = super.list[Model](pluralName, uri.copy(query = query), extraHeaders:_*)
   
   def create(create: Create, extraHeaders: Header*): F[Model] = super.post(wrappedAt, create, uri, extraHeaders:_*)
