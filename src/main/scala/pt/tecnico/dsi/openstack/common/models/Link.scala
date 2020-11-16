@@ -1,5 +1,7 @@
 package pt.tecnico.dsi.openstack.common.models
 
+import cats.derived
+import cats.Show
 import io.circe.{Codec, Decoder, DecodingFailure, HCursor}
 import io.circe.derivation.deriveCodec
 import org.http4s.Uri
@@ -31,6 +33,11 @@ object Link {
     if (value.isArray) Decoder.decodeList[Link].apply(cursor) // This cursor.as[List[Link]] would lead to a stack overflow
     else if (value.isObject) value.dropNullValues.as[Map[String, Uri]].map(_.map{ case (rel, uri) => Link(rel, uri) }.toList)
     else Left(DecodingFailure("Links can only be a object or array.", cursor.history))
+  }
+  
+  implicit val showFoo: Show[Link] = {
+    import derived.auto.show._
+    derived.semiauto.show
   }
 }
 case class Link(rel: String, href: Uri)
