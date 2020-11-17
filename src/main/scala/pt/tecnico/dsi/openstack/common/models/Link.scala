@@ -1,6 +1,5 @@
 package pt.tecnico.dsi.openstack.common.models
 
-import cats.derived
 import cats.Show
 import io.circe.{Codec, Decoder, DecodingFailure, HCursor}
 import io.circe.derivation.deriveCodec
@@ -10,7 +9,6 @@ import org.http4s.circe.{decodeUri, encodeUri}
 object Link {
   implicit val codec: Codec.AsObject[Link] = deriveCodec
 
-  // TODO: is this the right place for this decoder?
   implicit val linksDecoder: Decoder[List[Link]] = { cursor: HCursor =>
     // Openstack has two ways to represent links (because why not):
     // This one is mostly used in Keystone and Designate
@@ -30,14 +28,11 @@ object Link {
     //     }
     //   ]
     val value = cursor.value
-    if (value.isArray) Decoder.decodeList[Link].apply(cursor) // This cursor.as[List[Link]] would lead to a stack overflow
+    if (value.isArray) Decoder.decodeList[Link].apply(cursor) // cursor.as[List[Link]] would lead to a stack overflow
     else if (value.isObject) value.dropNullValues.as[Map[String, Uri]].map(_.map{ case (rel, uri) => Link(rel, uri) }.toList)
     else Left(DecodingFailure("Links can only be a object or array.", cursor.history))
   }
   
-  implicit val showFoo: Show[Link] = {
-    import derived.auto.show._
-    derived.semiauto.show
-  }
+  implicit val show: Show[Link] = Show.show(l => s"${l.rel} = ${l.href}")
 }
 case class Link(rel: String, href: Uri)

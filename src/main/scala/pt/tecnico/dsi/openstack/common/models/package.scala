@@ -7,5 +7,6 @@ import org.http4s.Uri
 
 package object models {
   implicit val showUri: Show[Uri] = Show.fromToString[Uri]
+  // Show we instead use https://github.com/ChristopherDavenport/cats-time?
   implicit val showOffsetDateTime: Show[OffsetDateTime] = Show.show(_.format(ISO_OFFSET_DATE_TIME))
 }
