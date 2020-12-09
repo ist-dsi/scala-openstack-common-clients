@@ -1,12 +1,9 @@
 package pt.tecnico.dsi.openstack.common
 
-import java.time.OffsetDateTime
-import java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME
 import cats.Show
 import org.http4s.Uri
 
 package object models {
+  // https://github.com/http4s/http4s/issues/3998
   implicit val showUri: Show[Uri] = Show.fromToString[Uri]
-  // Show we instead use https://github.com/ChristopherDavenport/cats-time?
-  implicit val showOffsetDateTime: Show[OffsetDateTime] = Show.show(_.format(ISO_OFFSET_DATE_TIME))
 }

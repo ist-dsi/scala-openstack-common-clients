@@ -5,7 +5,7 @@ name := "scala-openstack-common-clients"
 // ==== Compile Options =================================================================================================
 // ======================================================================================================================
 javacOptions ++= Seq("-Xlint", "-encoding", "UTF-8", "-Dfile.encoding=utf-8")
-scalaVersion := "2.13.3"
+scalaVersion := "2.13.4"
 
 scalacOptions ++= Seq(
   "-encoding", "utf-8",            // Specify character encoding used by source files.
@@ -41,10 +41,11 @@ scalacOptions in (Test, console) := (scalacOptions in (Compile, console)).value
 // ==== Dependencies ====================================================================================================
 // ======================================================================================================================
 libraryDependencies ++= Seq("blaze-client", "circe").map { module =>
-  "org.http4s"      %% s"http4s-$module"  % "1.0.0-M6"
+  "org.http4s"        %% s"http4s-$module"  % "1.0.0-M8"
 } ++ Seq(
-  "io.circe"        %% "circe-derivation" % "0.13.0-M4",
-  "org.typelevel"   %% "kittens"          % "2.2.0", // For show instances
+  "io.circe"          %% "circe-derivation" % "0.13.0-M5",
+  "io.chrisdavenport" %% "cats-time"        % "0.3.4",
+  "org.typelevel"     %% "kittens"          % "2.2.1", // For show instances
 )
 addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
 
