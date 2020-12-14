@@ -100,7 +100,7 @@ abstract class Service[F[_]](baseUri: Uri, val name: String, protected val authT
    */
   protected def expectUnwrapped[R: Decoder](wrappedAt: Option[String], request: Request[F]): F[R] = {
     implicit val e: EntityDecoder[F, R] = unwrapped(wrappedAt)
-    client.expectOr(request)(defaultOnError)
+    client.expectOr(request)(defaultOnError(request, _))
   }
   
   /**
@@ -110,7 +110,7 @@ abstract class Service[F[_]](baseUri: Uri, val name: String, protected val authT
    */
   protected def expectOptionUnwrapped[R: Decoder](wrappedAt: Option[String], request: Request[F]): F[Option[R]] = {
     implicit val e: EntityDecoder[F, R] = unwrapped(wrappedAt)
-    client.expectOptionOr(request)(defaultOnError)
+    client.expectOptionOr(request)(defaultOnError(request, _))
   }
   
   /**
@@ -175,10 +175,11 @@ abstract class Service[F[_]](baseUri: Uri, val name: String, protected val authT
   protected def postHandleConflict[V: Encoder, R: Decoder](wrappedAt: Option[String], value: V, uri: Uri, extraHeaders: Seq[Header])(onConflict: F[R]): F[R] = {
     implicit val d: EntityDecoder[F, R] = unwrapped(wrappedAt)
     implicit val e: EntityEncoder[F, V] = wrapped(wrappedAt)
-    client.run(POST(value, uri, (authToken +: extraHeaders):_*)).use {
+    val request = POST(value, uri, (authToken +: extraHeaders): _*)
+    client.run(request).use {
       case Successful(response) => response.as[R]
       case Conflict(_) => onConflict
-      case response => defaultOnError(response)
+      case response => defaultOnError(request, response)
     }
   }
   
@@ -236,14 +237,21 @@ abstract class Service[F[_]](baseUri: Uri, val name: String, protected val authT
    * @param uri the uri to which the request will be made.
    * @param extraHeaders extra headers to be used. The `authToken` header is always added.
    */
-  protected def delete(uri: Uri, extraHeaders: Header*): F[Unit] =
-    client.run(DELETE.apply(uri, (authToken +: extraHeaders):_*)).use {
+  protected def delete(uri: Uri, extraHeaders: Header*): F[Unit] = {
+    val request = DELETE.apply(uri, (authToken +: extraHeaders): _*)
+    client.run(request).use {
       case Successful(_) | NotFound(_) | Gone(_) => F.unit
-      case response => defaultOnError(response)
+      case response => defaultOnError(request, response)
     }
-  
-  protected def defaultOnError[R](response: Response[F]): F[R] = {
-    // https://github.com/http4s/http4s/issues/3707
-    response.bodyText.compile.foldMonoid.flatMap(bodyString => F.raiseError(UnexpectedStatus(response.status, bodyString)))
   }
+  
+  protected def defaultOnError[R](request: Request[F], response: Response[F]): F[R] = for {
+    requestBody: String <- request.bodyText.compile.foldMonoid
+    responseBody: String <- response.bodyText.compile.foldMonoid
+    // The defaultOnError implemented in the DefaultClient is not very helpful to debug problems
+    // Most notably it does not show the body of the response when the request is not successful.
+    // https://github.com/http4s/http4s/issues/3707
+    // So we created our own UnexpectedStatus with a much more detailed information
+    result <- F.raiseError[R](UnexpectedStatus(request.method, request.uri, requestBody, response.status, responseBody))
+  } yield result
 }

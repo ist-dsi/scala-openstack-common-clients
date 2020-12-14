@@ -1,8 +1,12 @@
 package pt.tecnico.dsi.openstack.common.models
 
-import scala.util.control.NoStackTrace
-import org.http4s.Status
+import org.http4s.{Method, Status, Uri}
 
-final case class UnexpectedStatus(status: Status, body: String) extends RuntimeException with NoStackTrace {
-  override def getMessage: String = s"unexpected HTTP $status:\n$body"
+final case class UnexpectedStatus(requestMethod: Method, requestUri: Uri, requestBody: String, responseStatus: Status, responseBody: String)
+  extends RuntimeException {
+  override def getMessage: String =
+    s"""While executing $requestMethod $requestUri with body:
+       |$responseBody
+       |Got unexpected HTTP $responseStatus with body:
+       |$responseBody"""".stripMargin
 }
