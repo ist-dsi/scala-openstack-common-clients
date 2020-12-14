@@ -17,6 +17,7 @@ abstract class Service[F[_]](baseUri: Uri, val name: String, protected val authT
   (implicit protected val client: Client[F], protected val F: Sync[F]) {
   
   val pluralName = s"${name}s"
+  /** The `baseUri` with the `pluraName` appended as an extra path element. */
   val uri: Uri = baseUri / pluralName
   
   // This basically gives us the ability to do POST(value, uri, (authToken +: extraHeaders):_*)
