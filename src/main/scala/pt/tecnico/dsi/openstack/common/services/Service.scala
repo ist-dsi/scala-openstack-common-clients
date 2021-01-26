@@ -1,6 +1,6 @@
 package pt.tecnico.dsi.openstack.common.services
 
-import cats.effect.Sync
+import cats.effect.Concurrent
 import cats.syntax.flatMap._
 import cats.syntax.functor._
 import cats.instances.string._
@@ -14,7 +14,7 @@ import org.http4s.{EntityDecoder, EntityEncoder, Header, Method, Request, Respon
 import pt.tecnico.dsi.openstack.common.models.{Link, UnexpectedStatus}
 
 abstract class Service[F[_]](baseUri: Uri, val name: String, protected val authToken: Header)
-  (implicit protected val client: Client[F], protected val F: Sync[F]) {
+  (implicit protected val client: Client[F], protected val F: Concurrent[F]) {
   
   val pluralName = s"${name}s"
   /** The `baseUri` with the `pluraName` appended as an extra path element. */

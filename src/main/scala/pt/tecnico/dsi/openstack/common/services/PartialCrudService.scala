@@ -1,6 +1,6 @@
 package pt.tecnico.dsi.openstack.common.services
 
-import cats.effect.Sync
+import cats.effect.Concurrent
 import org.http4s.client.Client
 import org.http4s.{Header, Uri}
 
@@ -13,7 +13,7 @@ import org.http4s.{Header, Uri}
  * @param wrapped whether the request and response bodies should be wrapped inside a JsonObject.
  * @tparam F the effect to use.
  */
-abstract class PartialCrudService[F[_]: Sync: Client](baseUri: Uri, name: String, authToken: Header, wrapped: Boolean = true)
+abstract class PartialCrudService[F[_]: Concurrent: Client](baseUri: Uri, name: String, authToken: Header, wrapped: Boolean = true)
   extends Service[F](baseUri, name, authToken) {
   protected val wrappedAt: Option[String] = Option.when(wrapped)(name)
 }

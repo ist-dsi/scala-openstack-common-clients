@@ -41,7 +41,7 @@ scalacOptions in (Test, console) := (scalacOptions in (Compile, console)).value
 // ==== Dependencies ====================================================================================================
 // ======================================================================================================================
 libraryDependencies ++= Seq("blaze-client", "circe").map { module =>
-  "org.http4s"        %% s"http4s-$module"  % "1.0.0-M10"
+  "org.http4s"        %% s"http4s-$module"  % "1.0.0-M13"
 } ++ Seq(
   "io.circe"          %% "circe-derivation" % "0.13.0-M5",
   "io.chrisdavenport" %% "cats-time"        % "0.3.4",

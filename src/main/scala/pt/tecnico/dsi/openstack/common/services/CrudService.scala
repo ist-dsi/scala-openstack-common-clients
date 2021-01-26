@@ -1,6 +1,6 @@
 package pt.tecnico.dsi.openstack.common.services
 
-import cats.effect.Sync
+import cats.effect.Concurrent
 import io.circe.{Decoder, Encoder}
 import org.http4s.client.Client
 import org.http4s.{Header, Uri}
@@ -21,7 +21,7 @@ import pt.tecnico.dsi.openstack.common.models.Identifiable
  * @tparam Create the class with the available create elements of $domainModel.
  * @tparam Update the class with the available update elements of $domainModel.
  */
-abstract class CrudService[F[_]: Sync: Client, Model <: Identifiable, Create, Update]
+abstract class CrudService[F[_]: Concurrent: Client, Model <: Identifiable, Create, Update]
   (baseUri: Uri, name: String, authToken: Header, wrapped: Boolean = true)
   (implicit val modelDecoder: Decoder[Model], val createEncoder: Encoder[Create], val updateEncoder: Encoder[Update])
   extends PartialCrudService[F](baseUri, name, authToken, wrapped)
