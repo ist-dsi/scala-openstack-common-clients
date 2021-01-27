@@ -7,7 +7,7 @@ import org.http4s.Uri
 import org.http4s.circe.{decodeUri, encodeUri}
 
 object Link {
-  implicit val codec: Codec.AsObject[Link] = deriveCodec
+  implicit val codec: Codec[Link] = deriveCodec
 
   implicit val linksDecoder: Decoder[List[Link]] = { cursor: HCursor =>
     // Openstack has two ways to represent links (because why not):
