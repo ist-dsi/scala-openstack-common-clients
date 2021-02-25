@@ -5,7 +5,7 @@ name := "scala-openstack-common-clients"
 // ==== Compile Options =================================================================================================
 // ======================================================================================================================
 javacOptions ++= Seq("-Xlint", "-encoding", "UTF-8", "-Dfile.encoding=utf-8")
-scalaVersion := "2.13.4"
+scalaVersion := "2.13.5"
 
 scalacOptions ++= Seq(
   "-encoding", "utf-8",            // Specify character encoding used by source files.
@@ -41,7 +41,7 @@ scalacOptions in (Test, console) := (scalacOptions in (Compile, console)).value
 // ==== Dependencies ====================================================================================================
 // ======================================================================================================================
 libraryDependencies ++= Seq("blaze-client", "circe").map { module =>
-  "org.http4s"        %% s"http4s-$module"  % "1.0.0-M13"
+  "org.http4s"        %% s"http4s-$module"  % "1.0.0-M16"
 } ++ Seq(
   "io.circe"          %% "circe-derivation" % "0.13.0-M5",
   "io.chrisdavenport" %% "cats-time"        % "0.3.4",
