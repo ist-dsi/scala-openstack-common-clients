@@ -20,7 +20,7 @@ trait CreateNonIdempotentOperations[F[_], Model, Create] { this: PartialCrudServ
    * @param extraHeaders extra headers to pass when making the request. The `authToken` header is always added.
    * @return the created $domainModel
    */
-  def create(create: Create, extraHeaders: Header*): F[Model] = post(wrappedAt, create, uri, extraHeaders:_*)
+  def create(create: Create, extraHeaders: Header.ToRaw*): F[Model] = post(wrappedAt, create, uri, extraHeaders:_*)
   
   /*
    * We could go even further an implement in the client:
@@ -38,5 +38,5 @@ trait CreateNonIdempotentOperations[F[_], Model, Create] { this: PartialCrudServ
    *    keystone.projects(Project.Create(name, domainId = Some(usersDomain.id)))
    * }}}
    */
-  def apply(create: Create, extraHeaders: Header*): F[Model] = this.create(create, extraHeaders:_*)
+  def apply(create: Create, extraHeaders: Header.ToRaw*): F[Model] = this.create(create, extraHeaders:_*)
 }

@@ -2,9 +2,9 @@ package pt.tecnico.dsi.openstack.common.services
 
 import cats.effect.Concurrent
 import io.circe.{Decoder, Encoder}
+import org.http4s.Uri
 import org.http4s.client.Client
-import org.http4s.{Header, Uri}
-import pt.tecnico.dsi.openstack.common.models.Identifiable
+import pt.tecnico.dsi.openstack.common.models.{Identifiable, AuthToken}
 
 /**
  * A complete CRUD service capable of executing create, read, list, update, and delete operations idempotently.
@@ -22,7 +22,7 @@ import pt.tecnico.dsi.openstack.common.models.Identifiable
  * @tparam Update the class with the available update elements of $domainModel.
  */
 abstract class CrudService[F[_]: Concurrent: Client, Model <: Identifiable, Create, Update]
-  (baseUri: Uri, name: String, authToken: Header, wrapped: Boolean = true)
+  (baseUri: Uri, name: String, authToken: AuthToken, wrapped: Boolean = true)
   (implicit val modelDecoder: Decoder[Model], val createEncoder: Encoder[Create], val updateEncoder: Encoder[Update])
   extends PartialCrudService[F](baseUri, name, authToken, wrapped)
     with CreateNonIdempotentOperations[F, Model, Create]

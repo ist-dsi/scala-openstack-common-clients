@@ -23,7 +23,7 @@ trait CreateOperations[F[_], Model, Create, Update] {
    * @param extraHeaders extra headers to be used. The `authToken` header is always added.
    * @return the existing model if no modifications are required, otherwise the updated model.
    */
-  def defaultResolveConflict(existing: Model, create: Create, keepExistingElements: Boolean, extraHeaders: Seq[Header]): F[Model]
+  def defaultResolveConflict(existing: Model, create: Create, keepExistingElements: Boolean, extraHeaders: Seq[Header.ToRaw]): F[Model]
   
   /**
    * An idempotent create. If the model that is to be created already exists then it will be updated, or simply returned if no modifications
@@ -36,7 +36,7 @@ trait CreateOperations[F[_], Model, Create, Update] {
    * @param extraHeaders extra headers to be used. The `authToken` header is always added.
    * @return the created $domainModel, or if it already exists the existing or updated model.
    */
-  def createOrUpdate(create: Create, extraHeaders: Header*): F[Model] =
+  def createOrUpdate(create: Create, extraHeaders: Header.ToRaw*): F[Model] =
     createOrUpdate(create, keepExistingElements = true, extraHeaders:_*)
   /**
    * An idempotent create. If the model that is to be created already exists then it will be updated, or simply returned if no modifications
@@ -58,7 +58,7 @@ trait CreateOperations[F[_], Model, Create, Update] {
    *   Setting it to `false` will follow point 2, thus making the update more stringent.
    * @return the created $domainModel, or if it already exists the existing or updated model.
    */
-  def createOrUpdate(create: Create, keepExistingElements: Boolean, extraHeaders: Header*): F[Model] =
+  def createOrUpdate(create: Create, keepExistingElements: Boolean, extraHeaders: Header.ToRaw*): F[Model] =
     createOrUpdate(create, keepExistingElements, extraHeaders)()
   /**
    * An idempotent create. If the model that is to be created already exists then it will be updated, or simply returned if no modifications
@@ -81,7 +81,7 @@ trait CreateOperations[F[_], Model, Create, Update] {
    *                        on a model that already exists. By default it just invokes [[defaultResolveConflict]].
    * @return the created $domainModel, or if it already exists the existing or updated model.
    */
-  def createOrUpdate(create: Create, keepExistingElements: Boolean = true, extraHeaders: Seq[Header] = Seq.empty)
+  def createOrUpdate(create: Create, keepExistingElements: Boolean = true, extraHeaders: Seq[Header.ToRaw] = Seq.empty)
     (resolveConflict: (Model, Create) => F[Model] = defaultResolveConflict(_, _, keepExistingElements, extraHeaders)): F[Model]
   
   /**
@@ -92,7 +92,7 @@ trait CreateOperations[F[_], Model, Create, Update] {
    * @param onConflict the computation returning a $domainModel to execute when a Conflict is returned in the create.
    * @return the created $domainModel, or the updated $domainModel by `onConflict`.
    */
-  protected def createHandleConflict(create: Create, uri: Uri, extraHeaders: Seq[Header])(onConflict: F[Model]): F[Model] =
+  protected def createHandleConflict(create: Create, uri: Uri, extraHeaders: Seq[Header.ToRaw])(onConflict: F[Model]): F[Model] =
     postHandleConflict[Create, Model](wrappedAt, create, uri, extraHeaders)(onConflict)
   
   /**
@@ -106,7 +106,7 @@ trait CreateOperations[F[_], Model, Create, Update] {
    * @tparam E
    * @return the created $domainModel, or the updated $domainModel by `onConflict`.
    */
-  protected def createHandleConflictWithError[E <: Throwable: Decoder](create: Create, uri: Uri, extraHeaders: Seq[Header])
+  protected def createHandleConflictWithError[E <: Throwable: Decoder](create: Create, uri: Uri, extraHeaders: Seq[Header.ToRaw])
     (onConflict: E /=> F[Model]): F[Model] =
     postHandleConflictWithError[Create, Model, E](wrappedAt, create, uri, extraHeaders)(onConflict)
 }

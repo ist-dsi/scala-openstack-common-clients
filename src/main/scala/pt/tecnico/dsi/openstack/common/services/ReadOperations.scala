@@ -19,7 +19,7 @@ trait ReadOperations[F[_], Model] { this: PartialCrudService[F] =>
    * @param extraHeaders extra headers to pass when making the request. The `authToken` header is always added.
    * @return a Some with the $domainModel if it exists. A None otherwise.
    */
-  def get(id: String, extraHeaders: Header*): F[Option[Model]] = getOption(wrappedAt, uri / id, extraHeaders:_*)
+  def get(id: String, extraHeaders: Header.ToRaw*): F[Option[Model]] = getOption(wrappedAt, uri / id, extraHeaders:_*)
   
   /**
    * Gets the $domainModel with the specified `id`, assuming it exists.
@@ -27,7 +27,7 @@ trait ReadOperations[F[_], Model] { this: PartialCrudService[F] =>
    * @param extraHeaders extra headers to pass when making the request. The `authToken` header is always added.
    * @return the $domainModel with the given `id`. If none exists F will contain an error.
    */
-  def apply(id: String, extraHeaders: Header*): F[Model] =
+  def apply(id: String, extraHeaders: Header.ToRaw*): F[Model] =
     get(id, extraHeaders:_*).flatMap {
       case Some(model) => F.pure(model)
       case None => F.raiseError(new NoSuchElementException(s"""Could not find $name with id "$id"."""))

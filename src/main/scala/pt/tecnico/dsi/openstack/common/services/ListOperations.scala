@@ -24,7 +24,7 @@ trait ListOperations[F[_], Model] { this: PartialCrudService[F] =>
    * @param query the query to use when performing the request.
    * @param extraHeaders extra headers to pass when making the request. The `authToken` header is always added.
    */
-  def stream(query: Query, extraHeaders: Header*): Stream[F, Model] = stream[Model](pluralName, uri.copy(query = query), extraHeaders:_*)
+  def stream(query: Query, extraHeaders: Header.ToRaw*): Stream[F, Model] = stream[Model](pluralName, uri.copy(query = query), extraHeaders:_*)
   
   /**
    * Lists all ${domainModel}(s) using the specified `pairs` as the query params.
@@ -39,5 +39,5 @@ trait ListOperations[F[_], Model] { this: PartialCrudService[F] =>
    * @param query the query to use when performing the request.
    * @param extraHeaders extra headers to pass when making the request. The `authToken` header is always added.
    */
-  def list(query: Query, extraHeaders: Header*): F[List[Model]] = list[Model](pluralName, uri.copy(query = query), extraHeaders:_*)
+  def list(query: Query, extraHeaders: Header.ToRaw*): F[List[Model]] = list[Model](pluralName, uri.copy(query = query), extraHeaders:_*)
 }
