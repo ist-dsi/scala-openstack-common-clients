@@ -11,7 +11,7 @@ import org.http4s.Status.{Conflict, Gone, NotFound, Successful}
 import org.http4s.client.dsl.Http4sClientDsl
 import org.http4s.client.Client
 import org.http4s.{EntityDecoder, EntityEncoder, Header, Method, Request, Response, Uri, circe}
-import pt.tecnico.dsi.openstack.common.models.{Link, AuthToken, UnexpectedStatus}
+import pt.tecnico.dsi.openstack.common.models.{AuthToken, Link, UnexpectedStatus}
 
 abstract class Service[F[_]](baseUri: Uri, val name: String, protected val authToken: AuthToken)
   (implicit protected val client: Client[F], protected val F: Concurrent[F]) {
@@ -23,15 +23,15 @@ abstract class Service[F[_]](baseUri: Uri, val name: String, protected val authT
   // This basically gives us the ability to do POST(value, uri, (authToken +: extraHeaders):_*)
   protected val dsl = new Http4sClientDsl[F] {}
   import dsl._
-
+  
   protected val jsonPrinter: Printer = Printer.noSpaces.copy(dropNullValues = true)
   protected implicit def jsonEncoder[A: Encoder]: EntityEncoder[F, A] = circe.jsonEncoderWithPrinterOf(jsonPrinter)
   protected implicit def jsonDecoder[A: Decoder]: EntityDecoder[F, A] = circe.accumulatingJsonOf
-
+  
   // Without this decoding to Unit wont work. This makes the EntityDecoder[F, Unit] defined in EntityDecoder companion object
   // have a higher priority than the jsonDecoder defined above. https://github.com/http4s/http4s/issues/2806
   protected implicit val void: EntityDecoder[F, Unit] = EntityDecoder.void
-
+  
   // If Openstack had a normal REST API (without the wrapping) we wouldn't need 80% of these methods.
   
   // The compiler is having difficulty inferring the type when we are doing
@@ -143,7 +143,7 @@ abstract class Service[F[_]](baseUri: Uri, val name: String, protected val authT
     implicit val e: EntityEncoder[F, B] = wrapped(wrappedAt)
     expectOptionUnwrapped(wrappedAt, method.apply(value, uri, (subjectTokenHeader +: extraHeaders):_*))
   }
-
+  
   /**
    * Invokes `method` on the specified `uri` without any body. The response will be parsed to an `R`.
    * @param wrappedAt whether to decode `R` at the Json root, or at the field `at`.
@@ -162,21 +162,21 @@ abstract class Service[F[_]](baseUri: Uri, val name: String, protected val authT
    */
   protected def expectOption[R: Decoder](wrappedAt: Option[String], method: Method, uri: Uri, extraHeaders: Header.ToRaw*): F[Option[R]] =
     expectOptionUnwrapped(wrappedAt, method.apply(uri, (subjectTokenHeader +: extraHeaders):_*))
-
+  
   protected def get[R: Decoder](wrappedAt: Option[String], uri: Uri, extraHeaders: Header.ToRaw*): F[R] =
     expect(wrappedAt, GET, uri, extraHeaders:_*)
   protected def getOption[R: Decoder](wrappedAt: Option[String], uri: Uri, extraHeaders: Header.ToRaw*): F[Option[R]] =
     expectOption(wrappedAt, GET, uri, extraHeaders:_*)
-
+  
   protected def put[V: Encoder, R: Decoder](wrappedAt: Option[String], value: V, uri: Uri, extraHeaders: Header.ToRaw*): F[R] =
     expect(wrappedAt, PUT, value, uri, extraHeaders:_*)
-
+  
   protected def patch[V: Encoder, R: Decoder](wrappedAt: Option[String], value: V, uri: Uri, extraHeaders: Header.ToRaw*): F[R] =
     expect(wrappedAt, PATCH, value, uri, extraHeaders:_*)
   
   protected def post[V: Encoder, R: Decoder](wrappedAt: Option[String], value: V, uri: Uri, extraHeaders: Header.ToRaw*): F[R] =
     expect(wrappedAt, POST, value, uri, extraHeaders:_*)
-
+  
   protected def postHandleConflict[V: Encoder, R: Decoder](wrappedAt: Option[String], value: V, uri: Uri, extraHeaders: Seq[Header.ToRaw])(onConflict: F[R]): F[R] = {
     implicit val d: EntityDecoder[F, R] = unwrapped(wrappedAt)
     implicit val e: EntityEncoder[F, V] = wrapped(wrappedAt)
@@ -202,7 +202,7 @@ abstract class Service[F[_]](baseUri: Uri, val name: String, protected val authT
       }
     }
   }
-
+  
   /**
    * Invokes a GET request on the specified `uri`, expecting the returned json to be paginated. Automatically fetches more pages
    * if more elements of the stream are consumed.
@@ -217,7 +217,7 @@ abstract class Service[F[_]](baseUri: Uri, val name: String, protected val authT
       next = links.collectFirst { case Link("next", uri) => uri }
       objectList <- c.downField(wrappedAt).as[List[R]]
     } yield (next, objectList)
-
+    
     Stream.unfoldChunkEval[F, Option[Uri], R](Some(uri)) {
       case Some(uri) =>
         client.expect[(Option[Uri], List[R])](GET.apply(uri, (subjectTokenHeader +: extraHeaders): _*))
@@ -236,7 +236,7 @@ abstract class Service[F[_]](baseUri: Uri, val name: String, protected val authT
    */
   protected def list[R: Decoder](wrappedAt: String, uri: Uri, extraHeaders: Header.ToRaw*): F[List[R]] =
     stream(wrappedAt, uri, extraHeaders:_*).compile.toList
-
+  
   /**
    * An idempotent delete. If NotFound or Gone are returned this method will succeed.
    * @param uri the uri to which the request will be made.

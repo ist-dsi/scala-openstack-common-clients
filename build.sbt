@@ -32,16 +32,16 @@ scalacOptions ++= Seq(
 
 // These lines ensure that in sbt console or sbt test:console the -Ywarn* and the -Xfatal-warning are not bothersome.
 // https://stackoverflow.com/questions/26940253/in-sbt-how-do-you-override-scalacoptions-for-console-in-all-configurations
-scalacOptions in (Compile, console) ~= (_.filterNot { option =>
+Compile / console / scalacOptions ~= (_.filterNot { option =>
   option.startsWith("-W") || option.startsWith("-Xlint")
 })
-scalacOptions in (Test, console) := (scalacOptions in (Compile, console)).value
+Test / console / scalacOptions := (Compile / console / scalacOptions).value
 
 // ======================================================================================================================
 // ==== Dependencies ====================================================================================================
 // ======================================================================================================================
 libraryDependencies ++= Seq("blaze-client", "circe").map { module =>
-  "org.http4s"        %% s"http4s-$module"  % "1.0.0-M19"
+  "org.http4s"        %% s"http4s-$module"  % "1.0.0-M21"
 } ++ Seq(
   "io.circe"          %% "circe-derivation" % "0.13.0-M5",
   "io.chrisdavenport" %% "cats-time"        % "0.3.4",
@@ -61,7 +61,7 @@ latestReleasedVersion := git.gitDescribedVersion.value.getOrElse("0.0.1-SNAPSHOT
 // link against the API documentation using autoAPIMappings.
 apiURL := Some(url(s"${homepage.value.get}/api/${latestReleasedVersion.value}/"))
 autoAPIMappings := true // Tell scaladoc to look for API documentation of managed dependencies in their metadata.
-scalacOptions in (Compile, doc) ++= Seq(
+Compile / doc / scalacOptions ++= Seq(
   "-author",      // Include authors.
   "-diagrams",    // Create inheritance diagrams for classes, traits and packages.
   "-groups",      // Group similar functions together (based on the @group annotation)
@@ -69,12 +69,12 @@ scalacOptions in (Compile, doc) ++= Seq(
   "-doc-title", name.value.capitalize,
   "-doc-version", latestReleasedVersion.value,
   "-doc-source-url", s"${homepage.value.get}/tree/v${latestReleasedVersion.value}€{FILE_PATH}.scala",
-  "-sourcepath", (baseDirectory in ThisBuild).value.getAbsolutePath,
+  "-sourcepath", baseDirectory.value.getAbsolutePath,
 )
 
 enablePlugins(GhpagesPlugin, SiteScaladocPlugin)
-siteSubdirName in SiteScaladoc := s"api/${version.value}"
-excludeFilter in ghpagesCleanSite := AllPassFilter // We want to keep all the previous API versions
+SiteScaladoc / siteSubdirName := s"api/${version.value}"
+ghpagesCleanSite / excludeFilter := AllPassFilter // We want to keep all the previous API versions
 val latestFileName = "latest"
 val createLatestSymlink = taskKey[Unit](s"Creates a symlink named $latestFileName which points to the latest version.")
 createLatestSymlink := {
@@ -92,7 +92,7 @@ createLatestSymlink := {
 ghpagesPushSite := ghpagesPushSite.dependsOn(createLatestSymlink).value
 ghpagesBranch := "gh-pages"
 ghpagesNoJekyll := false
-envVars in ghpagesPushSite := Map("SBT_GHPAGES_COMMIT_MESSAGE" -> s"Add Scaladocs for version ${latestReleasedVersion.value}")
+ghpagesPushSite / envVars := Map("SBT_GHPAGES_COMMIT_MESSAGE" -> s"Add Scaladocs for version ${latestReleasedVersion.value}")
 
 // ======================================================================================================================
 // ==== Publishing/Release ==============================================================================================
