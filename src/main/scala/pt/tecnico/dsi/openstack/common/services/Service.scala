@@ -1,9 +1,9 @@
 package pt.tecnico.dsi.openstack.common.services
 
 import cats.effect.Concurrent
-import cats.syntax.flatMap._
-import cats.syntax.functor._
-import cats.instances.string._
+import cats.syntax.flatMap.*
+import cats.syntax.functor.*
+import cats.instances.string.*
 import fs2.{Chunk, Stream}
 import io.circe.{Decoder, Encoder, HCursor, Json, Printer}
 import org.http4s.Method.{DELETE, GET, PATCH, POST, PUT}
@@ -14,7 +14,7 @@ import org.http4s.{EntityDecoder, EntityEncoder, Header, Method, Request, Respon
 import pt.tecnico.dsi.openstack.common.models.{AuthToken, Link, UnexpectedStatus}
 
 abstract class Service[F[_]](baseUri: Uri, val name: String, protected val authToken: AuthToken)
-  (implicit protected val client: Client[F], protected val F: Concurrent[F]) {
+  (implicit protected val client: Client[F], val F: Concurrent[F]) {
   
   val pluralName = s"${name}s"
   /** The `baseUri` with the `pluraName` appended as an extra path element. */
@@ -22,7 +22,7 @@ abstract class Service[F[_]](baseUri: Uri, val name: String, protected val authT
   
   // This basically gives us the ability to do POST(value, uri, (authToken +: extraHeaders):_*)
   protected val dsl = new Http4sClientDsl[F] {}
-  import dsl._
+  import dsl.*
   
   protected val jsonPrinter: Printer = Printer.noSpaces.copy(dropNullValues = true)
   protected implicit def jsonEncoder[A: Encoder]: EntityEncoder[F, A] = circe.jsonEncoderWithPrinterOf(jsonPrinter)
@@ -64,7 +64,7 @@ abstract class Service[F[_]](baseUri: Uri, val name: String, protected val authT
    * @param decoder the circe decoder capable of converting Json to an R.
    */
   protected def unwrapped[R](at: Option[String] = None)(implicit decoder: Decoder[R]): EntityDecoder[F, R] =
-    jsonDecoder(at.fold(decoder)(decoder.at))
+    jsonDecoder(using at.fold(decoder)(decoder.at))
 
   /**
    * Creates an `EntityEncoder` which will encode `R` to a Json.
@@ -90,33 +90,30 @@ abstract class Service[F[_]](baseUri: Uri, val name: String, protected val authT
    * @param at whether to encode `R` at the Json root, or at the field `at`.
    * @param encoder the circe encoder capable of converting an R to Json.
    */
-  protected def wrapped[R](at: Option[String] = None)(implicit encoder: Encoder[R]): EntityEncoder[F, R] = {
+  protected def wrapped[R](at: Option[String] = None)(implicit encoder: Encoder[R]): EntityEncoder[F, R] =
     //jsonEncoder(at.fold(encoder)(encoder.at))
-    jsonEncoder(at.fold(encoder) { name =>
+    jsonEncoder(using at.fold(encoder) { name =>
       // https://github.com/circe/circe/issues/1536
       encoder.mapJson(originalJson => Json.obj(name -> originalJson))
     })
-  }
   
   /**
    * Submits `request` and decodes the response to a `R` on success.
    * @param wrappedAt whether to decode `R` at the Json root, or at the field `at`.
    * @param request the request to execute.
    */
-  protected def expectUnwrapped[R: Decoder](wrappedAt: Option[String], request: Request[F]): F[R] = {
+  protected def expectUnwrapped[R: Decoder](wrappedAt: Option[String], request: Request[F]): F[R] =
     implicit val e: EntityDecoder[F, R] = unwrapped(wrappedAt)
     client.expectOr(request)(defaultOnError(request, _))
-  }
   
   /**
    * Submits `request` and decodes the response to a `Option[R]` on success.
    * @param wrappedAt whether to decode `R` at the Json root, or at the field `at`.
    * @param request the request to execute.
    */
-  protected def expectOptionUnwrapped[R: Decoder](wrappedAt: Option[String], request: Request[F]): F[Option[R]] = {
+  protected def expectOptionUnwrapped[R: Decoder](wrappedAt: Option[String], request: Request[F]): F[Option[R]] =
     implicit val e: EntityDecoder[F, R] = unwrapped(wrappedAt)
     client.expectOptionOr(request)(defaultOnError(request, _))
-  }
   
   /**
    * Invokes `method` on the specified `uri` passing as body `value`. The response will be parsed to an `R`.
@@ -126,10 +123,9 @@ abstract class Service[F[_]](baseUri: Uri, val name: String, protected val authT
    * @param uri the uri to which the request will be made.
    * @param extraHeaders extra headers to be used. The `authToken` header is always added.
    */
-  protected def expect[V: Encoder, R: Decoder](wrappedAt: Option[String], method: Method, value: V, uri: Uri, extraHeaders: Header.ToRaw*): F[R] = {
+  protected def expect[V: Encoder, R: Decoder](wrappedAt: Option[String], method: Method, value: V, uri: Uri, extraHeaders: Header.ToRaw*): F[R] =
     implicit val e: EntityEncoder[F, V] = wrapped(wrappedAt)
-    expectUnwrapped(wrappedAt, method.apply(value, uri, (subjectTokenHeader +: extraHeaders):_*))
-  }
+    expectUnwrapped(wrappedAt, method.apply(value, uri, (subjectTokenHeader +: extraHeaders) *))
   /**
    * Invokes `method` on the specified `uri` passing as body `value`. The response will be parsed to an `Option[R]`.
    * @param wrappedAt whether to encode `B` and decode `R` at the Json root, or at the field `at`.
@@ -139,10 +135,9 @@ abstract class Service[F[_]](baseUri: Uri, val name: String, protected val authT
    * @param extraHeaders extra headers to be used. The `authToken` header is always added.
    */
   protected def expectOption[B: Encoder, R: Decoder](wrappedAt: Option[String], method: Method, value: B, uri: Uri, extraHeaders: Header.ToRaw*)
-  : F[Option[R]] = {
+  : F[Option[R]] =
     implicit val e: EntityEncoder[F, B] = wrapped(wrappedAt)
-    expectOptionUnwrapped(wrappedAt, method.apply(value, uri, (subjectTokenHeader +: extraHeaders):_*))
-  }
+    expectOptionUnwrapped(wrappedAt, method.apply(value, uri, (subjectTokenHeader +: extraHeaders) *))
   
   /**
    * Invokes `method` on the specified `uri` without any body. The response will be parsed to an `R`.
@@ -152,7 +147,7 @@ abstract class Service[F[_]](baseUri: Uri, val name: String, protected val authT
    * @param extraHeaders extra headers to be used. The `authToken` header is always added.
    */
   protected def expect[R: Decoder](wrappedAt: Option[String], method: Method, uri: Uri, extraHeaders: Header.ToRaw*): F[R] =
-    expectUnwrapped(wrappedAt, method.apply(uri, (subjectTokenHeader +: extraHeaders):_*))
+    expectUnwrapped(wrappedAt, method.apply(uri, (subjectTokenHeader +: extraHeaders) *))
   /**
    * Invokes `method` on the specified `uri` without any body. The response will be parsed to an `Option[R]`.
    * @param wrappedAt whether to decode `R` at the Json root, or at the field `at`.
@@ -161,47 +156,42 @@ abstract class Service[F[_]](baseUri: Uri, val name: String, protected val authT
    * @param extraHeaders extra headers to be used. The `authToken` header is always added.
    */
   protected def expectOption[R: Decoder](wrappedAt: Option[String], method: Method, uri: Uri, extraHeaders: Header.ToRaw*): F[Option[R]] =
-    expectOptionUnwrapped(wrappedAt, method.apply(uri, (subjectTokenHeader +: extraHeaders):_*))
+    expectOptionUnwrapped(wrappedAt, method.apply(uri, (subjectTokenHeader +: extraHeaders) *))
   
   protected def get[R: Decoder](wrappedAt: Option[String], uri: Uri, extraHeaders: Header.ToRaw*): F[R] =
-    expect(wrappedAt, GET, uri, extraHeaders:_*)
+    expect(wrappedAt, GET, uri, extraHeaders *)
   protected def getOption[R: Decoder](wrappedAt: Option[String], uri: Uri, extraHeaders: Header.ToRaw*): F[Option[R]] =
-    expectOption(wrappedAt, GET, uri, extraHeaders:_*)
+    expectOption(wrappedAt, GET, uri, extraHeaders *)
   
   protected def put[V: Encoder, R: Decoder](wrappedAt: Option[String], value: V, uri: Uri, extraHeaders: Header.ToRaw*): F[R] =
-    expect(wrappedAt, PUT, value, uri, extraHeaders:_*)
+    expect(wrappedAt, PUT, value, uri, extraHeaders *)
   
   protected def patch[V: Encoder, R: Decoder](wrappedAt: Option[String], value: V, uri: Uri, extraHeaders: Header.ToRaw*): F[R] =
-    expect(wrappedAt, PATCH, value, uri, extraHeaders:_*)
+    expect(wrappedAt, PATCH, value, uri, extraHeaders *)
   
   protected def post[V: Encoder, R: Decoder](wrappedAt: Option[String], value: V, uri: Uri, extraHeaders: Header.ToRaw*): F[R] =
-    expect(wrappedAt, POST, value, uri, extraHeaders:_*)
+    expect(wrappedAt, POST, value, uri, extraHeaders *)
   
-  protected def postHandleConflict[V: Encoder, R: Decoder](wrappedAt: Option[String], value: V, uri: Uri, extraHeaders: Seq[Header.ToRaw])(onConflict: F[R]): F[R] = {
+  protected def postHandleConflict[V: Encoder, R: Decoder](wrappedAt: Option[String], value: V, uri: Uri, extraHeaders: Seq[Header.ToRaw])(onConflict: F[R]): F[R] =
     implicit val d: EntityDecoder[F, R] = unwrapped(wrappedAt)
     implicit val e: EntityEncoder[F, V] = wrapped(wrappedAt)
-    val request = POST(value, uri, (subjectTokenHeader +: extraHeaders): _*)
-    client.run(request).use {
+    val request = POST(value, uri, (subjectTokenHeader +: extraHeaders) *)
+    client.run(request).use:
       case Successful(response) => response.as[R]
       case Conflict(_) => onConflict
       case response => defaultOnError(request, response)
-    }
-  }
   
   type /=>[-T, +R] = PartialFunction[T, R]
   
   protected def postHandleConflictWithError[V: Encoder, R: Decoder, E <: Throwable: Decoder]
-  (wrappedAt: Option[String], value: V, uri: Uri, extraHeaders: Seq[Header.ToRaw])(onConflict: E /=> F[R]): F[R] = {
+  (wrappedAt: Option[String], value: V, uri: Uri, extraHeaders: Seq[Header.ToRaw])(onConflict: E /=> F[R]): F[R] =
     implicit val d: EntityDecoder[F, R] = unwrapped(wrappedAt)
     implicit val e: EntityEncoder[F, V] = wrapped(wrappedAt)
-    client.run(POST.apply(value, uri, (subjectTokenHeader +: extraHeaders):_*)).use {
+    client.run(POST.apply(value, uri, (subjectTokenHeader +: extraHeaders) *)).use:
       case Successful(response) => response.as[R]
-      case response => response.as[E].flatMap {
+      case response => response.as[E].flatMap:
         case error if response.status == Conflict => onConflict.applyOrElse(error, F.raiseError)
         case error => F.raiseError(error)
-      }
-    }
-  }
   
   /**
    * Invokes a GET request on the specified `uri`, expecting the returned json to be paginated. Automatically fetches more pages
@@ -211,20 +201,18 @@ abstract class Service[F[_]](baseUri: Uri, val name: String, protected val authT
    * @param extraHeaders extra headers to be used. The `authToken` header is always added.
    * @tparam R the type of the elements returned.
    */
-  protected def stream[R: Decoder](wrappedAt: String, uri: Uri, extraHeaders: Header.ToRaw*): Stream[F, R] = {
-    implicit val paginatedDecoder: Decoder[(Option[Uri], List[R])] = (c: HCursor) => for {
+  protected def stream[R: Decoder](wrappedAt: String, uri: Uri, extraHeaders: Header.ToRaw*): Stream[F, R] =
+    implicit val paginatedDecoder: Decoder[(Option[Uri], List[R])] = (c: HCursor) => for
       links <- c.get[List[Link]]("links") orElse c.getOrElse(s"${wrappedAt}_links")(List.empty[Link])
       next = links.collectFirst { case Link("next", uri) => uri }
       objectList <- c.downField(wrappedAt).as[List[R]]
-    } yield (next, objectList)
+    yield (next, objectList)
     
-    Stream.unfoldChunkEval[F, Option[Uri], R](Some(uri)) {
+    Stream.unfoldChunkEval[F, Option[Uri], R](Some(uri)):
       case Some(uri) =>
-        client.expect[(Option[Uri], List[R])](GET.apply(uri, (subjectTokenHeader +: extraHeaders): _*))
+        client.expect[(Option[Uri], List[R])](GET.apply(uri, (subjectTokenHeader +: extraHeaders) *))
           .map { case (next, entries) => Some((Chunk.iterable(entries), next)) }
       case None => F.pure(None)
-    }
-  }
   
   /**
    * Invokes a GET request on the specified `uri`, expecting to receive a list of elements. If the response is paginated <b>all</b>
@@ -235,28 +223,27 @@ abstract class Service[F[_]](baseUri: Uri, val name: String, protected val authT
    * @tparam R the type of the elements returned.
    */
   protected def list[R: Decoder](wrappedAt: String, uri: Uri, extraHeaders: Header.ToRaw*): F[List[R]] =
-    stream(wrappedAt, uri, extraHeaders:_*).compile.toList
+    stream(wrappedAt, uri, extraHeaders *).compile.toList
   
   /**
    * An idempotent delete. If NotFound or Gone are returned this method will succeed.
    * @param uri the uri to which the request will be made.
    * @param extraHeaders extra headers to be used. The `authToken` header is always added.
    */
-  protected def delete(uri: Uri, extraHeaders: Header.ToRaw*): F[Unit] = {
-    val request = DELETE.apply(uri, (subjectTokenHeader +: extraHeaders): _*)
-    client.run(request).use {
+  protected def delete(uri: Uri, extraHeaders: Header.ToRaw*): F[Unit] =
+    val request = DELETE.apply(uri, (subjectTokenHeader +: extraHeaders) *)
+    client.run(request).use:
       case Successful(_) | NotFound(_) | Gone(_) => F.unit
       case response => defaultOnError(request, response)
-    }
-  }
   
-  protected def defaultOnError[R](request: Request[F], response: Response[F]): F[R] = for {
-    requestBody: String <- request.bodyText.compile.foldMonoid
-    responseBody: String <- response.bodyText.compile.foldMonoid
-    // The defaultOnError implemented in the DefaultClient is not very helpful to debug problems
-    // Most notably it does not show the body of the response when the request is not successful.
-    // https://github.com/http4s/http4s/issues/3707
-    // So we created our own UnexpectedStatus with a much more detailed information
-    result <- F.raiseError[R](UnexpectedStatus(request.method, request.uri, requestBody, response.status, responseBody))
-  } yield result
+  protected def defaultOnError[R](request: Request[F], response: Response[F]): F[R] =
+    for
+      requestBody: String <- request.bodyText.compile.foldMonoid
+      responseBody: String <- response.bodyText.compile.foldMonoid
+      // The defaultOnError implemented in the DefaultClient is not very helpful to debug problems
+      // Most notably it does not show the body of the response when the request is not successful.
+      // https://github.com/http4s/http4s/issues/3707
+      // So we created our own UnexpectedStatus with a much more detailed information
+      result <- F.raiseError[R](UnexpectedStatus(request.method, request.uri, requestBody, response.status, responseBody))
+    yield result
 }

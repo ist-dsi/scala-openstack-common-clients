@@ -12,7 +12,7 @@ import org.http4s.{Header, Uri}
  * @tparam Update the class with the available update elements of $domainModel.
  */
 trait CreateOperations[F[_], Model, Create, Update] {
-  this: PartialCrudService[F] with CreateNonIdempotentOperations[F, Model, Create] with UpdateOperations[F, Model, Update] =>
+  this: PartialCrudService[F] & CreateNonIdempotentOperations[F, Model, Create] & UpdateOperations[F, Model, Update] =>
   
   /**
    * Default implementation to resolve the conflict that arises when implementing the createOrUpdate.
@@ -37,7 +37,7 @@ trait CreateOperations[F[_], Model, Create, Update] {
    * @return the created $domainModel, or if it already exists the existing or updated model.
    */
   def createOrUpdate(create: Create, extraHeaders: Header.ToRaw*): F[Model] =
-    createOrUpdate(create, keepExistingElements = true, extraHeaders:_*)
+    createOrUpdate(create, keepExistingElements = true, extraHeaders*)
   /**
    * An idempotent create. If the model that is to be created already exists then it will be updated, or simply returned if no modifications
    * are necessary. The definition on what is considered already existing is left to the implementation as it is specific to the `Model`

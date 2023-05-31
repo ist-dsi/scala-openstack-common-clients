@@ -11,8 +11,8 @@ import org.http4s.Header
  * @tparam Update the class with the available update elements of $domainModel.
  */
 trait UpdateOperations[F[_], Model, Update] { this: PartialCrudService[F] =>
-  implicit val modelDecoder: Decoder[Model]
-  implicit val updateEncoder: Encoder[Update]
+  given modelDecoder: Decoder[Model]
+  given updateEncoder: Encoder[Update]
   
   /**
    * Updates the $domainModel with the given `id` using the values in `update`.
@@ -21,7 +21,7 @@ trait UpdateOperations[F[_], Model, Update] { this: PartialCrudService[F] =>
    * @param extraHeaders extra headers to pass when making the request. The `authToken` header is always added.
    * @return the updated $domainModel.
    */
-  def update(id: String, update: Update, extraHeaders: Header.ToRaw*): F[Model] = put(wrappedAt, update, uri / id, extraHeaders:_*)
+  def update(id: String, update: Update, extraHeaders: Header.ToRaw*): F[Model] = put(wrappedAt, update, uri / id, extraHeaders*)
   
   /*
    * For domain classes which use the .Create for the .Update class this might be misleading
@@ -39,5 +39,5 @@ trait UpdateOperations[F[_], Model, Update] { this: PartialCrudService[F] =>
    *    cinder.quotas(project.id, Quota.Update(...))
    * }}}
    */
-  def apply(id: String, update: Update, extraHeaders: Header.ToRaw*): F[Model] = this.update(id, update, extraHeaders:_*)
+  def apply(id: String, update: Update, extraHeaders: Header.ToRaw*): F[Model] = this.update(id, update, extraHeaders*)
 }

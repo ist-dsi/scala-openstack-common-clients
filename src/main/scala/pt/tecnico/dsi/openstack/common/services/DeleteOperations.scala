@@ -15,12 +15,12 @@ trait DeleteOperations[F[_], Model <: Identifiable] { this: PartialCrudService[F
    * @param model the $domainModel to delete.
    * @param extraHeaders extra headers to pass when making the request. The `authToken` header is always added.
    */
-  def delete(model: Model, extraHeaders: Header.ToRaw*): F[Unit] = delete(model.id, extraHeaders:_*)
+  def delete(model: Model, extraHeaders: Header.ToRaw*): F[Unit] = delete(model.id, extraHeaders*)
   
   /**
    * Deletes the $domainModel with the given `id`.
    * @param id the id of the $domainModel to delete. Usually a random UUID.
    * @param extraHeaders extra headers to pass when making the request. The `authToken` header is always added.
    */
-  def delete(id: String, extraHeaders: Header.ToRaw*): F[Unit] = delete(uri / id, extraHeaders:_*)
+  def delete(id: String, extraHeaders: Header.ToRaw*): F[Unit] = delete(uri / id, extraHeaders*)
 }

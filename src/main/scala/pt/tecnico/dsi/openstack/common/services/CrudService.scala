@@ -23,7 +23,7 @@ import pt.tecnico.dsi.openstack.common.models.{Identifiable, AuthToken}
  */
 abstract class CrudService[F[_]: Concurrent: Client, Model <: Identifiable, Create, Update]
   (baseUri: Uri, name: String, authToken: AuthToken, wrapped: Boolean = true)
-  (implicit val modelDecoder: Decoder[Model], val createEncoder: Encoder[Create], val updateEncoder: Encoder[Update])
+  (using val modelDecoder: Decoder[Model], val createEncoder: Encoder[Create], val updateEncoder: Encoder[Update])
   extends PartialCrudService[F](baseUri, name, authToken, wrapped)
     with CreateNonIdempotentOperations[F, Model, Create]
     with UpdateOperations[F, Model, Update]
